@@ -52,7 +52,7 @@ class Socket < IO::FileDescriptor
 
   # Creates an UNIX socket. Consider using `UNIXSocket` or `UNIXServer` unless
   # you need full control over the socket.
-  def self.unix(type : Type = Type::Stream, blocking = false)
+  def self.unix(type : Type = Type::STREAM, blocking = false)
     new(Family::UNIX, type, blocking: blocking)
   end
 
@@ -94,7 +94,7 @@ class Socket < IO::FileDescriptor
   #
   # ```
   # sock = Socket.unix
-  # sock.connect UNIXAddress.new("/tmp/service.sock")
+  # sock.connect Socket::UNIXAddress.new("/tmp/service.sock")
   # ```
   def connect(addr, timeout = nil) : Nil
     connect(addr, timeout) { |error| raise error }
@@ -246,8 +246,8 @@ class Socket < IO::FileDescriptor
   #
   # ```
   # sock = Socket.unix(Socket::Type::DGRAM)
-  # sock.connect("/tmp/service.sock")
-  # sock.send(binary_message)
+  # sock.connect Socket::UNIXAddress.new("/tmp/service.sock")
+  # sock.send(Bytes[0])
   # ```
   def send(message : Bytes)
     bytes_sent = LibC.send(fd, message.to_unsafe.as(Void*), message.size, 0)
@@ -447,7 +447,7 @@ class Socket < IO::FileDescriptor
     optval
   end
 
-  # optval is restricted to Int32 until sizeof works on variables
+  # optval is restricted to `Int32` until sizeof works on variables
   def setsockopt(optname, optval, level = LibC::SOL_SOCKET)
     optsize = LibC::SocklenT.new(sizeof(typeof(optval)))
     ret = LibC.setsockopt(fd, level, optname, (pointerof(optval).as(Void*)), optsize)

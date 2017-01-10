@@ -2,29 +2,37 @@ module FileUtils
   extend self
 
   # Changes the current working directory of the process to the given string *path*.
-  # Alias of Dir.cd.
+  #
   # ```
   # require "file_utils"
-  # FileUtils.cd("to/directory")
+  #
+  # FileUtils.cd("/tmp")
   # ```
+  #
+  # NOTE: Alias of `Dir.cd`
   def cd(path : String)
     Dir.cd(path)
   end
 
   # Changes the current working firectory of the process to the given string *path*
   # and invoked the block, restoring the original working directory when the block exits.
-  # Alias of Dir.cd with block.
+  #
   # ```
-  # FileUtils.cd("to/directory") { puts "Do something useful here!" }
+  # FileUtils.cd("/tmp") { Dir.current } # => "/tmp"
   # ```
+  #
+  # NOTE: Alias of `Dir.cd` with block
   def cd(path : String)
     Dir.cd(path) { yield }
   end
 
   # Compares two files *filename1* to *filename2* to determine if they are identical.
   # Returns true if content are the same, false otherwise.
+  #
   # ```
-  # FileUtils.cmp("foo.cr", "bar.cr")
+  # File.write("file.cr", "1")
+  # File.write("bar.cr", "1")
+  # FileUtils.cmp("file.cr", "bar.cr") # => true
   # ```
   def cmp(filename1 : String, filename2 : String)
     return false unless File.size(filename1) == File.size(filename2)
@@ -38,8 +46,12 @@ module FileUtils
 
   # Compares two streams *stream1* to *stream2* to determine if they are identical.
   # Returns true if content are the same, false otherwise.
+  #
   # ```
-  # FileUtils.cmp(stream1 : IO, stream2 : IO)
+  # File.write("afile", "123")
+  # stream1 = File.open("afile")
+  # stream2 = IO::Memory.new("123")
+  # FileUtils.cmp(stream1, stream2) # => true
   # ```
   def cmp(stream1 : IO, stream2 : IO)
     buf1 = uninitialized UInt8[1024]
@@ -58,8 +70,11 @@ module FileUtils
   # Copies the file *src_path* to the file or directory *dest*.
   # If *dest* is a directory, a file with the same basename as *src_path* is created in *dest*
   # Permission bits are copied too.
+  #
   # ```
-  # FileUtils.cp("file_utils.cr", "file_utils_copy.cr")
+  # File.chmod("afile", 0o600)
+  # FileUtils.cp("afile", "afile_copy")
+  # File.stat("afile_copy").perm # => 0o600
   # ```
   def cp(src_path : String, dest : String)
     File.open(src_path) do |s|
@@ -72,8 +87,10 @@ module FileUtils
 
   # Copies a list of files *src* to *dest*.
   # *dest* must be an existing directory.
+  #
   # ```
-  # FileUtils.cp({"cgi.cr", "complex.cr", "date.cr"}, "files")
+  # Dir.mkdir("files")
+  # FileUtils.cp({"bar.cr", "afile"}, "files")
   # ```
   def cp(srcs : Enumerable(String), dest : String)
     raise ArgumentError.new("no such directory : #{dest}") unless Dir.exists?(dest)
@@ -82,10 +99,11 @@ module FileUtils
     end
   end
 
-  # Copies a file or directory *src_path* to *dest_path*
+  # Copies a file or directory *src_path* to *dest_path*.
   # If *src_path* is a directory, this method copies all its contents recursively
+  #
   # ```
-  # FileUtils.cp_r("src_dir", "src_dir_copy")
+  # FileUtils.cp_r("files", "dir")
   # ```
   def cp_r(src_path : String, dest_path : String)
     if Dir.exists?(src_path)
@@ -106,16 +124,19 @@ module FileUtils
 
   # Creates a new directory at the given *path*. The linux-style permission *mode*
   # can be specified, with a default of 777 (0o777).
-  # Alias of Dir.mkdir
+  #
   # ```
-  # FileUtils.mkdir("foo")
+  # FileUtils.mkdir("src")
   # ```
+  #
+  # NOTE: Alias of `Dir.mkdir`
   def mkdir(path : String, mode = 0o777) : Nil
     Dir.mkdir(path, mode)
   end
 
   # Creates a new directory at the given *paths*. The linux-style permission *mode*
   # can be specified, with a default of 777 (0o777).
+  #
   # ```
   # FileUtils.mkdir(["foo", "bar"])
   # ```
@@ -128,10 +149,12 @@ module FileUtils
   # Creates a new directory at the given *path*, including any non-existing
   # intermediate directories. The linux-style permission *mode* can be specified,
   # with a default of 777 (0o777).
-  # Alias of Dir.mkdir_p
+  #
   # ```
   # FileUtils.mkdir_p("foo")
   # ```
+  #
+  # NOTE: Alias of `Dir.mkdir_p`
   def mkdir_p(path : String, mode = 0o777) : Nil
     Dir.mkdir_p(path, mode)
   end
@@ -139,8 +162,9 @@ module FileUtils
   # Creates a new directory at the given *paths*, including any non-existing
   # intermediate directories. The linux-style permission *mode* can be specified,
   # with a default of 777 (0o777).
+  #
   # ```
-  # FileUtils.mkdir_p(["foo", "bar"])
+  # FileUtils.mkdir_p(["foo", "bar", "baz", "dir1", "dir2", "dir3"])
   # ```
   def mkdir_p(paths : Enumerable(String), mode = 0o777) : Nil
     paths.each do |path|
@@ -149,17 +173,20 @@ module FileUtils
   end
 
   # Moves *src_path* to *dest_path*.
-  # Alias of File.rename
+  #
   # ```
   # FileUtils.mv("afile", "afile.cr")
   # ```
+  #
+  # NOTE: Alias of `File.rename`
   def mv(src_path : String, dest_path : String) : Nil
     File.rename(src_path, dest_path)
   end
 
   # Moves every *srcs* to *dest*.
+  #
   # ```
-  # FileUtils.mv(["afile", "foo", "bar"], "src")
+  # FileUtils.mv(["foo", "bar"], "src")
   # ```
   def mv(srcs : Enumerable(String), dest : String) : Nil
     raise ArgumentError.new("no such directory : #{dest}") unless Dir.exists?(dest)
@@ -172,26 +199,31 @@ module FileUtils
   end
 
   # Returns the current working directory.
-  # Alias of Dir.current
+  #
   # ```
   # FileUtils.pwd
   # ```
+  #
+  # NOTE: Alias of `Dir.current`
   def pwd : String
     Dir.current
   end
 
   # Deletes the *path* file given.
-  # Alias of File.delete
+  #
   # ```
   # FileUtils.rm("afile.cr")
   # ```
+  #
+  # NOTE: Alias of `File.delete`
   def rm(path : String) : Nil
     File.delete(path)
   end
 
   # Deletes all *paths* file given.
+  #
   # ```
-  # FileUtils.rm(["afile.cr", "bfile.cr"])
+  # FileUtils.rm(["dir/afile", "afile_copy"])
   # ```
   def rm(paths : Enumerable(String)) : Nil
     paths.each do |path|
@@ -199,8 +231,9 @@ module FileUtils
     end
   end
 
-  # Deletes a file or directory *path*
+  # Deletes a file or directory *path*.
   # If *path* is a directory, this method removes all its contents recursively
+  #
   # ```
   # FileUtils.rm_r("dir")
   # FileUtils.rm_r("file.cr")
@@ -221,10 +254,11 @@ module FileUtils
     end
   end
 
-  # Deletes a list of files or directories *paths*
+  # Deletes a list of files or directories *paths*.
   # If one path is a directory, this method removes all its contents recursively
+  #
   # ```
-  # FileUtils.rm_r(["dir", "file.cr"])
+  # FileUtils.rm_r(["files", "bar.cr"])
   # ```
   def rm_r(paths : Enumerable(String)) : Nil
     paths.each do |path|
@@ -232,9 +266,10 @@ module FileUtils
     end
   end
 
-  # Deletes a file or directory *path*
+  # Deletes a file or directory *path*.
   # If *path* is a directory, this method removes all its contents recursively
   # Ignore all errors.
+  #
   # ```
   # FileUtils.rm_rf("dir")
   # FileUtils.rm_rf("file.cr")
@@ -247,9 +282,10 @@ module FileUtils
     end
   end
 
-  # Deletes a list of files or directories *paths*
+  # Deletes a list of files or directories *paths*.
   # If one path is a directory, this method removes all its contents recursively
   # Ignore all errors.
+  #
   # ```
   # FileUtils.rm_rf(["dir", "file.cr", "non_existent_file"])
   # ```
@@ -263,15 +299,18 @@ module FileUtils
   end
 
   # Removes the directory at the given *path*.
-  # Alias of Dir.rmdir
+  #
   # ```
-  # FileUtils.rmdir("dir")
+  # FileUtils.rmdir("baz")
   # ```
+  #
+  # NOTE: Alias of `Dir.rmdir`
   def rmdir(path : String) : Nil
     Dir.rmdir(path)
   end
 
   # Removes all directories at the given *paths*.
+  #
   # ```
   # FileUtils.rmdir(["dir1", "dir2", "dir3"])
   # ```

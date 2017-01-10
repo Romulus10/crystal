@@ -1,7 +1,7 @@
 # A named tuple is a fixed-size, immutable, stack-allocated mapping
 # of a fixed set of keys to values.
 #
-# You can think of a NamedTuple as an immutable `Hash` whose keys (which
+# You can think of a `NamedTuple` as an immutable `Hash` whose keys (which
 # are of type `Symbol`), and the types for each key, are known at compile time.
 #
 # A named tuple can be created with a named tuple literal:
@@ -9,8 +9,8 @@
 # ```
 # language = {name: "Crystal", year: 2011} # NamedTuple(name: String, year: Int32)
 #
-# language[:name]  # => "Crystal" (String)
-# language[:year]  # => 2011      (Int32)
+# language[:name]  # => "Crystal"
+# language[:year]  # => 2011
 # language[:other] # compile time error
 # ```
 #
@@ -30,21 +30,22 @@ struct NamedTuple
   #
   # ```
   # NamedTuple.new(name: "Crystal", year: 2011) #=> {name: "Crystal", year: 2011}
-  # NamedTuple.new                  #=> {}
-  #
-  # {}                         # syntax error
+  # NamedTuple.new # => {}
+  # {}             # syntax error
   # ```
   def self.new(**options : **T)
     options
   end
 
-  # Creates a named tuple from the given hash, with elements casted to the given types. See `#from`.
+  # Creates a named tuple from the given hash, with elements casted to the given types.
   #
   # ```
   # NamedTuple(foo: String, bar: Int64).from({:foo => "world", :bar => 2})       # => {foo: "world", bar: 2}
   # NamedTuple(foo: String, bar: Int64).from({"foo" => "world", "bar" => 2})     # => {foo: "world", bar: 2}
   # NamedTuple(foo: String, bar: Int64).from({:foo => "world", :bar => 2}).class # => {foo: String, bar: Int64}
   # ```
+  #
+  # See also: `#from`.
   def self.from(hash : Hash)
     {% begin %}
     NamedTuple.new(**{{T}}).from(hash)
@@ -57,6 +58,8 @@ struct NamedTuple
   # This allows you to easily pass a hash as individual named arguments to a method.
   #
   # ```
+  # require "json"
+  #
   # def speak_about(thing : String, n : Int64)
   #   "I see #{n} #{thing}s"
   # end
@@ -90,7 +93,7 @@ struct NamedTuple
   # tuple[key] # => 2011
   #
   # key = :other
-  # tuple[key] # # => KeyError
+  # tuple[key] # raises KeyError
   # ```
   def [](key : Symbol | String)
     fetch(key) { raise KeyError.new "Missing named tuple key: #{key.inspect}" }
@@ -156,7 +159,7 @@ struct NamedTuple
 
   # Returns a hash value based on this name tuple's size, keys and values.
   #
-  # See `Object#hash`.
+  # See also: `Object#hash`.
   def hash
     hash = 31 * size
     {% for key in T.keys.sort %}
@@ -213,6 +216,14 @@ struct NamedTuple
   def has_key?(key : Symbol) : Bool
     {% for key in T %}
       return true if {{key.symbolize}} == key
+    {% end %}
+    false
+  end
+
+  # ditto
+  def has_key?(key : String) : Bool
+    {% for key in T %}
+      return true if {{key.stringify}} == key
     {% end %}
     false
   end
@@ -279,11 +290,10 @@ struct NamedTuple
   # name = Crystal
   # year = 2011
   # ```
-  def each
+  def each : Nil
     {% for key in T %}
       yield {{key.symbolize}}, self[{{key.symbolize}}]
     {% end %}
-    self
   end
 
   # Yields each key in this named tuple.
@@ -301,11 +311,10 @@ struct NamedTuple
   # name
   # year
   # ```
-  def each_key
+  def each_key : Nil
     {% for key in T %}
       yield {{key.symbolize}}
     {% end %}
-    self
   end
 
   # Yields each value in this named tuple.
@@ -323,11 +332,10 @@ struct NamedTuple
   # Crystal
   # 2011
   # ```
-  def each_value
+  def each_value : Nil
     {% for key in T %}
       yield self[{{key.symbolize}}]
     {% end %}
-    self
   end
 
   # Yields each key and value, together with an index starting at *offset*, in this named tuple.
@@ -351,7 +359,6 @@ struct NamedTuple
       yield key, value, i
       i += 1
     end
-    self
   end
 
   # Returns an `Array` populated with the results of each iteration in the given block,
@@ -420,7 +427,7 @@ struct NamedTuple
   end
 
   # Returns `true` if this tuple has the same keys as *other*, and values
-  # for each key are the same in *self* and *other*.
+  # for each key are the same in `self` and *other*.
   #
   # ```
   # tuple1 = {name: "Crystal", year: 2011}

@@ -116,7 +116,7 @@ describe Iterator do
     it "yields the individual elements to the block" do
       iter = ["a", "b", "c"].each
       concatinated = ""
-      iter.each { |e| concatinated += e }
+      iter.each { |e| concatinated += e }.should be_nil
       concatinated.should eq "abc"
     end
   end
@@ -449,7 +449,7 @@ describe Iterator do
     end
 
     it "with block" do
-      iter = (1..8).each.uniq { |x| x % 3 }
+      iter = (1..8).each.uniq { |x| (x % 3).to_s }
       iter.next.should eq(1)
       iter.next.should eq(2)
       iter.next.should eq(3)

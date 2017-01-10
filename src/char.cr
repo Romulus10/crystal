@@ -157,7 +157,7 @@ struct Char
   #
   # ```
   # 'c'.ascii_lowercase? # => true
-  # 'ç'.lowercase?       # => false
+  # 'ç'.lowercase?       # => true
   # 'G'.ascii_lowercase? # => false
   # '.'.ascii_lowercase? # => false
   # ```
@@ -479,9 +479,9 @@ struct Char
   #
   # ```
   # 'a'.inspect      # => "'a'"
-  # '\t'.inspect     # => "'\t'"
+  # '\t'.inspect     # => "'\\t'"
   # 'あ'.inspect      # => "'あ'"
-  # '\u0012'.inspect # => "'\u{12}'"
+  # '\u0012'.inspect # => "'\\u{12}'"
   # ```
   def inspect
     dump_or_inspect do |io|
@@ -497,7 +497,7 @@ struct Char
 
   # Appends this char as a string that contains a char literal to the given `IO`.
   #
-  # See `#inspect`.
+  # See also: `#inspect`.
   def inspect(io)
     io << inspect
   end
@@ -507,9 +507,9 @@ struct Char
   #
   # ```
   # 'a'.dump      # => "'a'"
-  # '\t'.dump     # => "'\t'"
-  # 'あ'.dump      # => "'\u{3042}'"
-  # '\u0012'.dump # => "'\u{12}'"
+  # '\t'.dump     # => "'\\t'"
+  # 'あ'.dump      # => "'\\u{3042}'"
+  # '\u0012'.dump # => "'\\u{12}'"
   # ```
   def dump
     dump_or_inspect do |io|
@@ -525,7 +525,7 @@ struct Char
 
   # Appends this char as a string that contains a char literal to the given `IO`.
   #
-  # See `#dump`.
+  # See also: `#dump`.
   def dump(io)
     io << '\''
     io << dump
@@ -557,27 +557,27 @@ struct Char
   # ```
   # '1'.to_i     # => 1
   # '8'.to_i     # => 8
-  # 'c'.to_i     # => ArgumentError
+  # 'c'.to_i     # raises ArgumentError
   # '1'.to_i(16) # => 1
   # 'a'.to_i(16) # => 10
   # 'f'.to_i(16) # => 15
-  # 'z'.to_i(16) # => ArgumentError
+  # 'z'.to_i(16) # raises ArgumentError
   # ```
   def to_i(base : Int = 10) : Int32
     to_i?(base) || raise ArgumentError.new("Invalid integer: #{self}")
   end
 
   # Returns the integer value of this char if it's an ASCII char denoting a digit
-  # in *base*,  `nil` otherwise.
+  # in *base*, `nil` otherwise.
   #
   # ```
   # '1'.to_i     # => 1
   # '8'.to_i     # => 8
-  # 'c'.to_i     # => ArgumentError
+  # 'c'.to_i     # raises ArgumentError
   # '1'.to_i(16) # => 1
   # 'a'.to_i(16) # => 10
   # 'f'.to_i(16) # => 15
-  # 'z'.to_i(16) # => ArgumentError
+  # 'z'.to_i(16) # raises ArgumentError
   # ```
   def to_i?(base : Int = 10) : Int32?
     raise ArgumentError.new "invalid base #{base}, expected 2 to 36" unless 2 <= base <= 36
@@ -595,23 +595,23 @@ struct Char
     end
   end
 
-  # Same as `to_i`
+  # Same as `to_i`.
   def to_i32(base : Int = 10) : Int32
     to_i(base)
   end
 
-  # Same as `to_i?`
+  # Same as `to_i?`.
   def to_i32?(base : Int = 10) : Int32?
     to_i?(base)
   end
 
   {% for type in %w(i8 i16 i64 u8 u16 u32 u64) %}
-    # See `to_i`
+    # See also: `to_i`.
     def to_{{type.id}}(base : Int = 10)
       to_i(base).to_{{type.id}}
     end
 
-    # See `to_i?`
+    # See also: `to_i?`.
     def to_{{type.id}}?(base : Int = 10)
       to_i?(base).try &.to_{{type.id}}
     end
@@ -623,7 +623,7 @@ struct Char
   # ```
   # '1'.to_i # => 1.0
   # '8'.to_i # => 8.0
-  # 'c'.to_i # => ArgumentError
+  # 'c'.to_i # raises ArgumentError
   # ```
   def to_f
     to_f64
@@ -635,28 +635,28 @@ struct Char
   # ```
   # '1'.to_i # => 1.0
   # '8'.to_i # => 8.0
-  # 'c'.to_i # => ArgumentError
+  # 'c'.to_i # raises ArgumentError
   # ```
   def to_f?
     to_f64?
   end
 
-  # See `to_f`
+  # See also: `to_f`.
   def to_f32
     to_i.to_f32
   end
 
-  # See `to_f?`
+  # See also: `to_f?`.
   def to_f32?
     to_i?.try &.to_f32
   end
 
-  # Same as `to_f`
+  # Same as `to_f`.
   def to_f64
     to_i.to_f64
   end
 
-  # Same as `to_f?`
+  # Same as `to_f?`.
   def to_f64?
     to_i?.try &.to_f64
   end
@@ -687,7 +687,7 @@ struct Char
   # 129
   # 130
   # ```
-  def each_byte
+  def each_byte : Nil
     # See http://en.wikipedia.org/wiki/UTF-8#Sample_code
 
     c = ord

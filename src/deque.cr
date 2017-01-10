@@ -1,7 +1,7 @@
 # A Deque ("[double-ended queue](https://en.wikipedia.org/wiki/Double-ended_queue)") is a collection of objects of type
 # T that behaves much like an Array.
 #
-# Deque has a subset of Array's API. It performs better than an Array when there are frequent insertions or deletions
+# Deque has a subset of Array's API. It performs better than an `Array` when there are frequent insertions or deletions
 # of items near the beginning or the end.
 #
 # The most typical use case of a Deque is a queue: use `push` to add items to the end of the queue and `shift` to get
@@ -183,8 +183,8 @@ class Deque(T)
   #
   # ```
   # a = Deque{"a", "b", "b", "b", "c"}
-  # a.delete("b")
-  # a # => Deque{"a", "c"}
+  # a.delete("b") # => true
+  # a             # => Deque{"a", "c"}
   # ```
   def delete(obj)
     found = false
@@ -205,7 +205,8 @@ class Deque(T)
   #
   # ```
   # a = Deque{1, 2, 3}
-  # a.delete_at(1) # => Deque{1, 3}
+  # a.delete_at(1) # => 2
+  # a              # => Deque{1, 3}
   # ```
   def delete_at(index : Int)
     if index < 0
@@ -264,7 +265,7 @@ class Deque(T)
   # Yields each item in this deque, from first to last.
   #
   # Do not modify the deque while using this variant of `each`!
-  def each
+  def each : Nil
     halfs do |r|
       r.each do |i|
         yield @buffer[i]
@@ -356,7 +357,7 @@ class Deque(T)
   # ```
   # a = Deque{1, 2, 3}
   # a.pop # => 3
-  # # a == Deque{1, 2}
+  # a     # => Deque{1, 2}
   # ```
   def pop
     pop { raise IndexError.new }
@@ -435,7 +436,7 @@ class Deque(T)
   # ```
   # a = Deque{1, 2, 3}
   # a.shift # => 1
-  # # a == Deque{2, 3}
+  # a       # => Deque{2, 3}
   # ```
   def shift
     shift { raise IndexError.new }
@@ -476,7 +477,7 @@ class Deque(T)
     self
   end
 
-  # Returns an Array (shallow copy) that contains all the items of this deque.
+  # Returns an `Array` (shallow copy) that contains all the items of this deque.
   def to_a
     arr = Array(T).new(@size)
     each do |x|

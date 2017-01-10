@@ -347,6 +347,16 @@ describe IO do
       io.read_char.should be_nil
     end
 
+    it "reads string" do
+      io = SimpleIOMemory.new("hello world")
+      io.read_string(5).should eq("hello")
+      io.read_string(1).should eq(" ")
+      io.read_string(0).should eq("")
+      expect_raises(IO::EOFError) do
+        io.read_string(6)
+      end
+    end
+
     it "does each_line" do
       io = SimpleIOMemory.new("a\nbb\ncc")
       counter = 0
@@ -360,7 +370,41 @@ describe IO do
           line.should eq("cc")
         end
         counter += 1
-      end
+      end.should be_nil
+      counter.should eq(3)
+    end
+
+    it "does each_char" do
+      io = SimpleIOMemory.new("あいう")
+      counter = 0
+      io.each_char do |c|
+        case counter
+        when 0
+          c.should eq('あ')
+        when 1
+          c.should eq('い')
+        when 2
+          c.should eq('う')
+        end
+        counter += 1
+      end.should be_nil
+      counter.should eq(3)
+    end
+
+    it "does each_byte" do
+      io = SimpleIOMemory.new("abc")
+      counter = 0
+      io.each_byte do |b|
+        case counter
+        when 0
+          b.should eq('a'.ord)
+        when 1
+          b.should eq('b'.ord)
+        when 2
+          b.should eq('c'.ord)
+        end
+        counter += 1
+      end.should be_nil
       counter.should eq(3)
     end
 
@@ -466,6 +510,21 @@ describe IO do
       io << "hello world"
       io.skip(6)
       io.gets_to_end.should eq("world")
+    end
+
+    it "skips but raises if not enough bytes" do
+      io = SimpleIOMemory.new
+      io << "hello"
+      expect_raises(IO::EOFError) do
+        io.skip(6)
+      end
+    end
+
+    it "skips to end" do
+      io = SimpleIOMemory.new
+      io << "hello"
+      io.skip_to_end
+      io.read_byte.should be_nil
     end
   end
 

@@ -70,8 +70,11 @@ module HTTP
   def self.parse_header(line)
     # This is basically
     #
-    #     name, value = line.split ':', 2
-    #     {name, value.lstrip}
+    # ```
+    # line = "Server: nginx"
+    # name, value = line.split ':', 2
+    # {name, value.lstrip} # => {"Server", "nginx"}
+    # ```
     #
     # except that it's faster because we only create 2 strings
     # instead of 3 (two from the split and one for the lstrip),
@@ -156,7 +159,7 @@ module HTTP
     io << "0\r\n\r\n"
   end
 
-  # :nodoc
+  # :nodoc:
   def self.content_length(headers)
     headers["Content-Length"]?.try &.to_u64?
   end

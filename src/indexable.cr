@@ -46,7 +46,7 @@ module Indexable(T)
   # ```
   # a = [:foo, :bar]
   # a.at(0) # => :foo
-  # a.at(2) # => IndexError
+  # a.at(2) # raises IndexError
   # ```
   @[AlwaysInline]
   def at(index : Int)
@@ -100,7 +100,7 @@ module Indexable(T)
   # behind. If the block returns `true`, the finding element
   # is itself or exists infront.
   #
-  # Binary search needs sorted array, so self has to be sorted.
+  # Binary search needs sorted array, so `self` has to be sorted.
   #
   # Returns `nil` if the block didn't return `true` for any element.
   #
@@ -119,7 +119,7 @@ module Indexable(T)
   # behind. If the block returns `true`, the finding element
   # is itself or exists infront.
   #
-  # Binary search needs sorted array, so self has to be sorted.
+  # Binary search needs sorted array, so `self` has to be sorted.
   #
   # Returns `nil` if the block didn't return `true` for any element.
   #
@@ -178,13 +178,12 @@ module Indexable(T)
   # ```text
   # 0 -- 1 -- 2 --
   # ```
-  def each_index
+  def each_index : Nil
     i = 0
     while i < size
       yield i
       i += 1
     end
-    self
   end
 
   # Returns an `Iterator` for each index in `self`.
@@ -237,7 +236,7 @@ module Indexable(T)
   #
   # ```
   # ([1, 2, 3]).first   # => 1
-  # ([] of Int32).first # => raises IndexError
+  # ([] of Int32).first # raises IndexError
   # ```
   def first
     first { raise IndexError.new }
@@ -265,7 +264,7 @@ module Indexable(T)
 
   # Returns a hash code based on `self`'s size and elements.
   #
-  # See `Object#hash`.
+  # See also: `Object#hash`.
   def hash
     reduce(31 * size) do |memo, elem|
       31 * memo + elem.hash
@@ -287,7 +286,7 @@ module Indexable(T)
   # is found.
   #
   # ```
-  # [1, 2, 3, 1, 2, 3].rindex(offset: 4) { |x| x < 2 } # => 4
+  # [1, 2, 3, 1, 2, 3].index(offset: 2) { |x| x < 2 } # => 3
   # ```
   def index(offset : Int = 0)
     offset += size if offset < 0
@@ -305,7 +304,7 @@ module Indexable(T)
   #
   # ```
   # ([1, 2, 3]).last   # => 3
-  # ([] of Int32).last # => raises IndexError
+  # ([] of Int32).last # raises IndexError
   # ```
   def last
     last { raise IndexError.new }
@@ -324,7 +323,7 @@ module Indexable(T)
   # Returns the last element of `self` if it's not empty, or `nil`.
   #
   # ```
-  # ([1, 2, 3]).last?   # => 1
+  # ([1, 2, 3]).last?   # => 3
   # ([] of Int32).last? # => nil
   # ```
   def last?
@@ -332,11 +331,10 @@ module Indexable(T)
   end
 
   # Same as `#each`, but works in reverse.
-  def reverse_each(&block)
+  def reverse_each(&block) : Nil
     (size - 1).downto(0) do |i|
       yield unsafe_at(i)
     end
-    self
   end
 
   # Returns an `Iterator` over the elements of `self` in reverse order.

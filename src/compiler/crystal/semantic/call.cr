@@ -237,6 +237,12 @@ class Crystal::Call
       defined_method_missing = owner.check_method_missing(signature, self)
       if defined_method_missing
         matches = owner.lookup_matches(signature)
+      elsif with_scope = @with_scope
+        defined_method_missing = with_scope.check_method_missing(signature, self)
+        if defined_method_missing
+          matches = with_scope.lookup_matches(signature)
+          @uses_with_scope = true
+        end
       end
     end
 
@@ -356,7 +362,7 @@ class Crystal::Call
           bubbling_exception do
             visitor = MainVisitor.new(program, typed_def_args, typed_def)
             visitor.yield_vars = yield_vars
-            visitor.free_vars = match.context.free_vars
+            visitor.match_context = match.context
             visitor.untyped_def = match.def
             visitor.call = self
             visitor.scope = lookup_self_type

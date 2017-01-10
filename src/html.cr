@@ -33,13 +33,13 @@ module HTML
     string.gsub(SUBSTITUTIONS)
   end
 
-  # Encodes a string to HTML, but writes to the IO instance provided.
+  # Encodes a string to HTML, but writes to the `IO` instance provided.
   #
   # ```
   # require "html"
   #
   # io = IO::Memory.new
-  # HTML.escape("Crystal & You", io) # => "Crystal & You"
+  # HTML.escape("Crystal & You", io) # => nil
   # io.to_s                          # => "Crystal &amp; You"
   # ```
   def self.escape(string : String, io : IO)

@@ -3,10 +3,12 @@ require "c/unistd"
 require "c/sys/stat"
 
 # Objects of class Dir are directory streams representing directories in the underlying file system.
-# They provide a variety of ways to list directories and their contents. See also `File`.
+# They provide a variety of ways to list directories and their contents.
 #
 # The directory used in these examples contains the two regular files (config.h and main.rb),
 # the parent directory (..), and the directory itself (.).
+#
+# See also: `File`.
 class Dir
   include Enumerable(String)
   include Iterable(String)
@@ -42,6 +44,9 @@ class Dir
   # passing the filename of each entry as a parameter to the block.
   #
   # ```
+  # Dir.mkdir("testdir")
+  # File.write("testdir/config.h", "")
+  #
   # d = Dir.new("testdir")
   # d.each { |x| puts "Got #{x}" }
   # ```
@@ -52,9 +57,8 @@ class Dir
   # Got .
   # Got ..
   # Got config.h
-  # Got main.rb
   # ```
-  def each
+  def each : Nil
     while entry = read
       yield entry
     end
@@ -68,9 +72,11 @@ class Dir
   #
   # ```
   # d = Dir.new("testdir")
-  # d.read # => "."
-  # d.read # => ".."
-  # d.read # => "config.h"
+  # array = [] of String
+  # while file = d.read
+  #   array << file
+  # end
+  # array.sort # => [".", "..", "config.h"]
   # ```
   def read
     # readdir() returns NULL for failure and sets errno or returns NULL for EOF but leaves errno as is.  wtf.

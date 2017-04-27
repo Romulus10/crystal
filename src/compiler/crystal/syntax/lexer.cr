@@ -296,6 +296,7 @@ module Crystal
           when '(', '{', '[', '<'
             start_char = next_char
             next_char :SYMBOL_ARRAY_START
+            @token.raw = "%i#{start_char}" if @wants_raw
             @token.delimiter_state = Token::DelimiterState.new(:symbol_array, start_char, closing_char(start_char))
           else
             @token.type = :"%"
@@ -335,6 +336,7 @@ module Crystal
           when '(', '{', '[', '<'
             start_char = next_char
             next_char :STRING_ARRAY_START
+            @token.raw = "%w#{start_char}" if @wants_raw
             @token.delimiter_state = Token::DelimiterState.new(:string_array, start_char, closing_char(start_char))
           else
             @token.type = :"%"
@@ -485,10 +487,12 @@ module Crystal
                 io << "\f"
               when 'e'
                 io << "\e"
+              when 'x'
+                io.write_byte consume_string_hex_escape
               when 'u'
                 io << consume_string_unicode_escape
               when '0', '1', '2', '3', '4', '5', '6', '7'
-                io << consume_octal_escape(char)
+                io.write_byte consume_octal_escape(char)
               when '\n'
                 incr_line_number nil
                 io << "\n"
@@ -583,6 +587,10 @@ module Crystal
         case char1 = next_char
         when '\\'
           case char2 = next_char
+          when '\\'
+            @token.value = '\\'
+          when '\''
+            @token.value = '\''
           when 'b'
             @token.value = '\b'
           when 'e'
@@ -600,13 +608,12 @@ module Crystal
           when 'u'
             value = consume_char_unicode_escape
             @token.value = value.chr
-          when '0', '1', '2', '3', '4', '5', '6', '7'
-            char_value = consume_octal_escape(char2)
-            @token.value = char_value.chr
+          when '0'
+            @token.value = '\0'
           when '\0'
             raise "unterminated char literal", line, column
           else
-            @token.value = char2
+            raise "invalid char escape sequence", line, column
           end
         when '\''
           raise "invalid empty char literal (did you mean '\\\''?)", line, column
@@ -1746,16 +1753,27 @@ module Crystal
               string_token_escape_value "\f"
             when 'e'
               string_token_escape_value "\e"
+            when 'x'
+              value = consume_string_hex_escape
+              next_char
+              @token.type = :STRING
+              @token.value = String.new(1) do |buffer|
+                buffer[0] = value
+                {1, 0}
+              end
             when 'u'
               value = consume_string_unicode_escape
               next_char
               @token.type = :STRING
               @token.value = value
             when '0', '1', '2', '3', '4', '5', '6', '7'
-              char_value = consume_octal_escape(char)
+              value = consume_octal_escape(char)
               next_char
               @token.type = :STRING
-              @token.value = char_value.chr.to_s
+              @token.value = String.new(1) do |buffer|
+                buffer[0] = value
+                {1, 0}
+              end
             when '\n'
               incr_line_number
               @token.line_number = @line_number
@@ -2020,6 +2038,7 @@ module Crystal
           while ident_part?(char)
             char = next_char
           end
+          beginning_of_line = false
           @token.type = :MACRO_VAR
           @token.value = string_range_from_pool(start)
           @token.macro_state = Token::MacroState.new(whitespace, nest, delimiter_state, beginning_of_line, yields, comment)
@@ -2105,7 +2124,12 @@ module Crystal
             break
           end
         when '}'
-          if @macro_curly_count > 0
+          if delimiter_state && delimiter_state.end == '}'
+            delimiter_state = delimiter_state.with_open_count_delta(-1)
+            if delimiter_state.open_count == 0
+              delimiter_state = nil
+            end
+          elsif @macro_curly_count > 0
             # Once we find the final '}' that closes the interpolation,
             # we are back inside the delimiter
             if @macro_curly_count == 1
@@ -2242,14 +2266,17 @@ module Crystal
     end
 
     def consume_octal_escape(char)
-      char_value = char - '0'
+      value = char - '0'
       count = 1
       while count <= 3 && '0' <= peek_next_char < '8'
         next_char
-        char_value = char_value * 8 + (current_char - '0')
+        value = value * 8 + (current_char - '0')
         count += 1
       end
-      char_value
+      if value >= 256
+        raise "octal value too big"
+      end
+      value.to_u8
     end
 
     def consume_char_unicode_escape
@@ -2260,6 +2287,18 @@ module Crystal
       else
         consume_non_braced_unicode_escape
       end
+    end
+
+    def consume_string_hex_escape
+      char = next_char
+      high = char.to_i?(16)
+      raise "invalid hex escape" unless high
+
+      char = next_char
+      low = char.to_i?(16)
+      raise "invalid hex escape" unless low
+
+      ((high << 4) | low).to_u8
     end
 
     def consume_string_unicode_escape
@@ -2366,6 +2405,7 @@ module Crystal
       end
 
       if current_char == @token.delimiter_state.end
+        @token.raw = current_char.to_s if @wants_raw
         next_char
         @token.type = :STRING_ARRAY_END
         return @token
@@ -2527,7 +2567,11 @@ module Crystal
     end
 
     def next_char_no_column_increment
-      @reader.next_char
+      char = @reader.next_char
+      if error = @reader.error
+        ::raise InvalidByteSequenceError.new("Unexpected byte 0x#{error.to_s(16)} at position #{@reader.pos}, malformed UTF-8")
+      end
+      char
     end
 
     def next_char

@@ -110,9 +110,9 @@ struct Int
   # Divides `self` by *other* using truncated division.
   #
   # In truncated division, given two integers x and y:
-  # * q = x.tdiv(y) is rounded toward zero
-  # * r = x.remainder(y) has the sign of the first argument
-  # * x == q*y + r
+  # * `q = x.tdiv(y)` is rounded toward zero
+  # * `r = x.remainder(y)` has the sign of the first argument
+  # * `x == q*y + r`
   #
   # For example:
   #
@@ -124,7 +124,7 @@ struct Int
   # -5    -3       1        -2
   # ```
   #
-  # Raises if *other* is zero, or if *other* is -1 and
+  # Raises if *other* is `0`, or if *other* is `-1` and
   # `self` is signed and is the minimum value for that
   # integer type.
   def tdiv(other : Int)
@@ -140,7 +140,7 @@ struct Int
 
     {% begin %}
       if self < 0 && self == {{@type}}::MIN && other == -1
-        raise ArgumentError.new "overflow: {{@type}}::MIN / -1"
+        raise ArgumentError.new "Overflow: {{@type}}::MIN / -1"
       end
     {% end %}
   end
@@ -255,7 +255,7 @@ struct Int
   # ```
   def **(exponent : Int) : self
     if exponent < 0
-      raise ArgumentError.new "cannot raise an integer to a negative integer power, use floats for that"
+      raise ArgumentError.new "Cannot raise an integer to a negative integer power, use floats for that"
     end
 
     result = self.class.new(1)
@@ -383,8 +383,8 @@ struct Int
   end
 
   private DIGITS_DOWNCASE = "0123456789abcdefghijklmnopqrstuvwxyz"
-  private DIGITS_UPCASE = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-  private DIGITS_BASE62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  private DIGITS_UPCASE   = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  private DIGITS_BASE62   = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
   def to_s
     to_s(10)

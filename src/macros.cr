@@ -1,4 +1,4 @@
-# Defines a **struct** with the given name and properties.
+# Defines a **`Struct`** with the given name and properties.
 #
 # The generated struct has a constructor with the given properties
 # in the same order as declared. The struct only provides getters,
@@ -83,7 +83,8 @@ macro record(name, *properties)
   end
 end
 
-# Prints a series of expressions together with their values. Useful for print style debugging.
+# Prints a series of expressions together with their values.
+# Useful for print style debugging.
 #
 # ```
 # a = 1
@@ -98,17 +99,25 @@ macro pp(*exps)
     {% exp = exps.first %}
     %prefix = "#{{{ exp.stringify }}} # => "
     ::print %prefix
-    PrettyPrint.format({{exp}}, STDOUT, width: 80 - %prefix.size, indent: %prefix.size)
+    %object = {{exp}}
+    PrettyPrint.format(%object, STDOUT, width: 80 - %prefix.size, indent: %prefix.size)
     ::puts
+    %object
   {% else %}
     %names = { {{*exps.map(&.stringify)}} }
     %max_size = %names.max_of &.size
-    {% for exp, i in exps %}
-      %prefix = "#{%names[{{i}}].ljust(%max_size)} # => "
-      ::print %prefix
-      PrettyPrint.format({{exp}}, STDOUT, width: 80 - %prefix.size, indent: %prefix.size)
-      ::puts
-    {% end %}
+    {
+      {% for exp, i in exps %}
+        begin
+          %prefix = "#{%names[{{i}}].ljust(%max_size)} # => "
+          ::print %prefix
+          %object = {{exp}}
+          PrettyPrint.format(%object, STDOUT, width: 80 - %prefix.size, indent: %prefix.size)
+          ::puts
+          %object
+        end,
+      {% end %}
+    }
   {% end %}
 end
 
@@ -116,6 +125,6 @@ macro assert_responds_to(var, method)
   if {{var}}.responds_to?(:{{method}})
     {{var}}
   else
-    raise "expected {{var}} to respond to :{{method}}, not #{ {{var}} }"
+    raise "Expected {{var}} to respond to :{{method}}, not #{ {{var}} }"
   end
 end

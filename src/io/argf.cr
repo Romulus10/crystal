@@ -32,34 +32,32 @@ class IO::ARGF
   end
 
   # :nodoc:
-  def gets(delimiter : Char, limit : Int, chomp = false) : String?
-    return super if @encoding
-
+  def peek
     first_initialize unless @initialized
 
     if current_io = @current_io
-      string = current_io.gets(delimiter, limit, chomp)
-      if !string && !@read_from_stdin
-        current_io.close
-        if @argv.empty?
-          @current_io = nil
-        else
-          read_next_argv
-          string = gets(delimiter, limit, chomp)
-        end
+      peek = current_io.peek
+      if peek && peek.empty? # EOF
+        peek_next
+      else
+        peek
       end
-    elsif !@read_from_stdin && !@argv.empty?
-      read_next_argv
-      string = gets(delimiter, limit, chomp)
     else
-      string = nil
+      peek_next
     end
+  end
 
-    string
+  private def peek_next
+    if !@read_from_stdin && !@argv.empty?
+      read_next_argv
+      self.peek
+    else
+      nil
+    end
   end
 
   def write(slice : Bytes)
-    raise IO::Error.new "can't write to ARGF"
+    raise IO::Error.new "Can't write to ARGF"
   end
 
   def path

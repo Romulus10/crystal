@@ -38,13 +38,15 @@ struct NamedTuple
   end
 
   # Creates a named tuple from the given hash, with elements casted to the given types.
+  # Here the Int32 | String union is cast to Int32.
   #
   # ```
-  # NamedTuple(foo: String, bar: Int64).from({:foo => "world", :bar => 2})       # => {foo: "world", bar: 2}
-  # NamedTuple(foo: String, bar: Int64).from({"foo" => "world", "bar" => 2})     # => {foo: "world", bar: 2}
-  # NamedTuple(foo: String, bar: Int64).from({:foo => "world", :bar => 2}).class # => {foo: String, bar: Int64}
-  # ```
+  # num_or_str = 42.as(Int32 | String)
+  # NamedTuple(name: String, val: Int32).from({"name" => "number", "val" => num_or_str}) # => {name: "number", val: 42}
   #
+  # num_or_str = "a string".as(Int32 | String)
+  # NamedTuple(name: String, val: Int32).from({"name" => "number", "val" => num_or_str}) # raises TypeCastError (cast from String to Int32 failed)
+  # ```
   # See also: `#from`.
   def self.from(hash : Hash)
     {% begin %}
@@ -397,10 +399,12 @@ struct NamedTuple
   # tuple.to_h # => {:name => "Crystal", :year => 2011}
   # ```
   def to_h
-    {% begin %}
+    {% if T.size == 0 %}
+      {% raise "Can't convert an empty NamedTuple to a Hash" %}
+    {% else %}
       {
         {% for key in T %}
-          {{key.symbolize}} => self[{{key.symbolize}}].clone,
+          {{key.symbolize}} => self[{{key.symbolize}}],
         {% end %}
       }
     {% end %}

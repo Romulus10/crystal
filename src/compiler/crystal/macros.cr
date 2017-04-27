@@ -6,7 +6,7 @@
 # `Macros` module are top-level methods that you can invoke, like `puts` and `run`.
 module Crystal::Macros
   # Compares two [semantic versions](http://semver.org/).
-  # Returns -1 if v1 < v2, 0 if v1 == v2, - if v1 > v2.
+  # Returns `-1` if `v1 < v2`, `0` if `v1 == v2` and `1` if `v1 > v2`.
   #
   # ```
   # {{ compare_versions("1.10.0", "1.2.0") }} # => 1
@@ -64,24 +64,48 @@ module Crystal::Macros
   # A simple example:
   #
   # ```
-  # # fetch.cr
-  # require "http/client"
-  #
-  # puts HTTP::Client.get(ARGV[0]).body
+  # # read.cr
+  # puts File.read(ARGV[0])
   # ```
   #
   # ```
   # # main.cr
-  # macro invoke_fetch
-  #   {{ run("./fetch", "http://example.com").stringify }}
+  # macro read_file_at_compile_time(filename)
+  #   {{ run("./read", filename).stringify }}
   # end
   #
-  # puts invoke_fetch
+  # puts read_file_at_compile_time("some_file.txt")
   # ```
   #
-  # The above generates a program that will have the contents of `http://example.com`.
-  # A connection to `http://example.com` is never made at runtime.
+  # The above generates a program that will have the contents of `some_file.txt`.
+  # The file, however, is read at compile time and will not be needed at runtime.
+  #
+  # NOTE: the compiler is allowed to cache the executable generated for
+  # *filename* and only recompile it if any of the files it depends on changes
+  # (their modified time). This is why it's **strongly discouraged** to use a program
+  # for `run` that changes in subsequent compilations (for example, if it executes
+  # shell commands at compile time, or other macro run programs). It's also strongly
+  # discouraged to have a macro run program take a lot of time, because this will
+  # slow down compilation times. Reading files is OK, opening an HTTP connection
+  # at compile-time will most likely result if very slow compilations.
   def run(filename, *args) : MacroId
+  end
+
+  # Skips the rest of the file from which it is executed.
+  # Typical usage is to skip files that have platform specific code,
+  # without having to surround the most relevant code in `{%...%}` macro blocks.
+  #
+  # Example:
+  #
+  # ```
+  # # sth_for_osx.cr
+  # {% skip() unless flag?(:darwin) %}
+  #
+  # # Class FooForMac will only be defined if we're compiling on OS X
+  # class FooForMac
+  # end
+  # ```
+  def skip : Nop
   end
 
   # This is the base class of all AST nodes. This methods are
@@ -345,6 +369,10 @@ module Crystal::Macros
     def gsub(regex : RegexLiteral, replacement : StringLiteral) : StringLiteral
     end
 
+    # Similar to `String#includes?`.
+    def includes?(search : StringLiteral | CharLiteral) : BoolLiteral
+    end
+
     # Similar to `String#size`.
     def size : NumberLiteral
     end
@@ -440,6 +468,10 @@ module Crystal::Macros
 
     # Similar to `String#gsub`.
     def gsub(regex : RegexLiteral, replacement : StringLiteral) : SymbolLiteral
+    end
+
+    # Similar to `String#includes?`.
+    def includes?(search : StringLiteral | CharLiteral) : BoolLiteral
     end
 
     # Similar to `String#size`.
@@ -1397,6 +1429,10 @@ module Crystal::Macros
     def gsub(regex : RegexLiteral, replacement : StringLiteral) : MacroId
     end
 
+    # Similar to `String#includes?`.
+    def includes?(search : StringLiteral | CharLiteral) : BoolLiteral
+    end
+
     # Similar to `String#size`.
     def size : NumberLiteral
     end
@@ -1460,6 +1496,10 @@ module Crystal::Macros
 
     # Returns the instance variables of this type.
     def instance_vars : ArrayLiteral(MetaVar)
+    end
+
+    # Returns all ancestors of this type.
+    def ancestors : ArrayLiteral(TypeNode)
     end
 
     # Returns the direct superclass of this type.

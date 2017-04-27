@@ -121,11 +121,32 @@ describe "Semantic: var" do
       "type must be Int32"
   end
 
+  it "parse local variable as method call even if local variable is declared in call arguments" do
+    assert_error %(
+      macro foo(x)
+        {{x}}
+      end
+      foo a : Int32
+      a
+    ),
+      "undefined local variable or method 'a'"
+  end
+
   it "errors if variable already exists" do
     assert_error %(
       a = true
       a : Int32
       ),
       "variable 'a' already declared"
+  end
+
+  it "errors if declaring generic type without type vars (with local var)" do
+    assert_error %(
+      class Foo(T)
+      end
+
+      x : Foo
+      ),
+      "can't declare variable of generic non-instantiated type Foo"
   end
 end

@@ -168,7 +168,7 @@ struct Atomic(T)
   # atomic.get     # => 10
   # ```
   def set(value : T)
-    Ops.store(pointerof(@value), value, :sequentially_consistent, true)
+    Ops.store(pointerof(@value), value.as(T), :sequentially_consistent, true)
     value
   end
 
@@ -187,7 +187,7 @@ struct Atomic(T)
     Ops.load(pointerof(@value), :sequentially_consistent, true)
   end
 
-  # **Non-atomically* returns this atomic's value.
+  # **Non-atomically** returns this atomic's value.
   def lazy_get
     @value
   end

@@ -398,6 +398,37 @@ describe "macro methods" do
     it "executes to_i(base)" do
       assert_macro "", %({{"1234".to_i(16)}}), [] of ASTNode, %(4660)
     end
+
+    it "executes string includes? char (true)" do
+      assert_macro "", %({{"spice".includes?('s')}}), [] of ASTNode, %(true)
+      assert_macro "", %({{"spice".includes?('p')}}), [] of ASTNode, %(true)
+      assert_macro "", %({{"spice".includes?('i')}}), [] of ASTNode, %(true)
+      assert_macro "", %({{"spice".includes?('c')}}), [] of ASTNode, %(true)
+      assert_macro "", %({{"spice".includes?('e')}}), [] of ASTNode, %(true)
+    end
+
+    it "executes string includes? char (false)" do
+      assert_macro "", %({{"spice".includes?('S')}}), [] of ASTNode, %(false)
+      assert_macro "", %({{"spice".includes?(' ')}}), [] of ASTNode, %(false)
+      assert_macro "", %({{"spice".includes?('!')}}), [] of ASTNode, %(false)
+      assert_macro "", %({{"spice".includes?('b')}}), [] of ASTNode, %(false)
+    end
+
+    it "executes string includes? string (true)" do
+      assert_macro "", %({{"spice".includes?("s")}}), [] of ASTNode, %(true)
+      assert_macro "", %({{"spice".includes?("e")}}), [] of ASTNode, %(true)
+      assert_macro "", %({{"spice".includes?("sp")}}), [] of ASTNode, %(true)
+      assert_macro "", %({{"spice".includes?("ce")}}), [] of ASTNode, %(true)
+      assert_macro "", %({{"spice".includes?("pic")}}), [] of ASTNode, %(true)
+    end
+
+    it "executes string includes? string (false)" do
+      assert_macro "", %({{"spice".includes?("Spi")}}), [] of ASTNode, %(false)
+      assert_macro "", %({{"spice".includes?(" spi")}}), [] of ASTNode, %(false)
+      assert_macro "", %({{"spice".includes?("ce ")}}), [] of ASTNode, %(false)
+      assert_macro "", %({{"spice".includes?("b")}}), [] of ASTNode, %(false)
+      assert_macro "", %({{"spice".includes?("spice ")}}), [] of ASTNode, %(false)
+    end
   end
 
   describe "macro id methods" do
@@ -407,6 +438,10 @@ describe "macro methods" do
       assert_macro "x", %({{x.starts_with?("hel")}}), [MacroId.new("hello")] of ASTNode, %(true)
       assert_macro "x", %({{x.chomp}}), [MacroId.new("hello\n")] of ASTNode, %(hello)
       assert_macro "x", %({{x.upcase}}), [MacroId.new("hello")] of ASTNode, %(HELLO)
+      assert_macro "x", %({{x.includes?("el")}}), [MacroId.new("hello")] of ASTNode, %(true)
+      assert_macro "x", %({{x.includes?("he")}}), [MacroId.new("hello")] of ASTNode, %(true)
+      assert_macro "x", %({{x.includes?("EL")}}), [MacroId.new("hello")] of ASTNode, %(false)
+      assert_macro "x", %({{x.includes?("cat")}}), [MacroId.new("hello")] of ASTNode, %(false)
     end
 
     it "compares with string" do
@@ -445,6 +480,10 @@ describe "macro methods" do
       assert_macro "x", %({{x.starts_with?("hel")}}), ["hello".symbol] of ASTNode, %(true)
       assert_macro "x", %({{x.chomp}}), [SymbolLiteral.new("hello\n")] of ASTNode, %(:hello)
       assert_macro "x", %({{x.upcase}}), ["hello".symbol] of ASTNode, %(:HELLO)
+      assert_macro "x", %({{x.includes?("el")}}), ["hello".symbol] of ASTNode, %(true)
+      assert_macro "x", %({{x.includes?("he")}}), ["hello".symbol] of ASTNode, %(true)
+      assert_macro "x", %({{x.includes?("EL")}}), ["hello".symbol] of ASTNode, %(false)
+      assert_macro "x", %({{x.includes?("cat")}}), ["hello".symbol] of ASTNode, %(false)
     end
 
     it "executes symbol == symbol" do
@@ -1011,6 +1050,31 @@ describe "macro methods" do
     it "executes instance_vars" do
       assert_macro("x", "{{x.instance_vars.map &.stringify}}", %(["bytesize", "length", "c"])) do |program|
         [TypeNode.new(program.string)] of ASTNode
+      end
+    end
+
+    it "executes ancestors" do
+      assert_macro("x", "{{x.ancestors}}", %([SomeModule, Reference, Object])) do |program|
+        mod = NonGenericModuleType.new(program, program, "SomeModule")
+        klass = NonGenericClassType.new(program, program, "SomeType", program.reference)
+        klass.include mod
+
+        [TypeNode.new(klass)] of ASTNode
+      end
+    end
+
+    it "executes ancestors (with generic)" do
+      assert_macro("x", "{{x.ancestors}}", %([SomeGenericModule(String), SomeGenericType(String), Reference, Object])) do |program|
+        generic_type = GenericClassType.new(program, program, "SomeGenericType", program.reference, ["T"])
+        generic_mod = GenericModuleType.new(program, program, "SomeGenericModule", ["T"])
+        type_var = {"T" => TypeNode.new(program.string)} of String => ASTNode
+        type = GenericClassInstanceType.new(program, generic_type, program.reference, type_var)
+        mod = GenericModuleInstanceType.new(program, generic_mod, type_var)
+
+        klass = NonGenericClassType.new(program, program, "SomeType", type)
+        klass.include mod
+
+        [TypeNode.new(klass)] of ASTNode
       end
     end
 

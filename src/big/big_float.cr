@@ -1,5 +1,5 @@
 require "c/string"
-require "./big"
+require "big"
 
 # A `BigFloat` can represent arbitrarily large floats.
 #
@@ -162,6 +162,7 @@ struct BigFloat < Float
 
   def inspect(io)
     to_s(io)
+    io << "_big_f"
   end
 
   def to_s(io : IO)

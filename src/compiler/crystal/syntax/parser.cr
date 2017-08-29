@@ -180,7 +180,7 @@ module Crystal
       end
 
       values.concat exps[assign_index + 1..-1]
-      if values.size != 1 && targets.size != 1 && targets.size != values.size
+      if values.size != 1 && targets.size != values.size
         raise "Multiple assignment count mismatch", location
       end
 
@@ -254,7 +254,7 @@ module Crystal
             raise "trailing `until` is not supported", @token
           when :rescue
             next_token_skip_space
-            rescue_body = parse_expression
+            rescue_body = parse_op_assign
             rescues = [Rescue.new(rescue_body)] of Rescue
             if atomic.is_a?(Assign)
               atomic.value = ExceptionHandler.new(atomic.value, rescues).at(location).tap { |e| e.suffix = true }
@@ -263,7 +263,7 @@ module Crystal
             end
           when :ensure
             next_token_skip_space
-            ensure_body = parse_expression
+            ensure_body = parse_op_assign
             if atomic.is_a?(Assign)
               atomic.value = ExceptionHandler.new(atomic.value, ensure: ensure_body).at(location).tap { |e| e.suffix = true }
             else
@@ -529,7 +529,8 @@ module Crystal
       end
     end
 
-    parse_operator :mul_or_div, :prefix, "Call.new left, method, [right] of ASTNode, name_column_number: method_column_number", ":\"*\", :\"/\", :\"%\""
+    parse_operator :mul_or_div, :pow, "Call.new left, method, [right] of ASTNode, name_column_number: method_column_number", ":\"*\", :\"/\", :\"%\""
+    parse_operator :pow, :prefix, "Call.new left, method, [right] of ASTNode, name_column_number: method_column_number", ":\"**\""
 
     def parse_prefix
       column_number = @token.column_number
@@ -545,11 +546,9 @@ module Crystal
           Call.new(arg, token_type.to_s, name_column_number: column_number).at(location).at_end(arg)
         end
       else
-        parse_pow
+        parse_atomic_with_method
       end
     end
-
-    parse_operator :pow, :atomic_with_method, "Call.new left, method, [right] of ASTNode, name_column_number: method_column_number", ":\"**\""
 
     AtomicWithMethodCheck = [:IDENT, :"+", :"-", :"*", :"/", :"%", :"|", :"&", :"^", :"**", :"<<", :"<", :"<=", :"==", :"!=", :"=~", :"!~", :">>", :">", :">=", :"<=>", :"===", :"[]", :"[]=", :"[]?", :"["]
 
@@ -640,10 +639,19 @@ module Crystal
               next_token
 
               if @token.type == :"("
-                next_token_skip_space
-                arg = parse_single_arg
-                check :")"
-                next_token
+                # If we have `f.x=(exp1).a.b.c`, consider it the same as `f.x = (exp1).a.b.c`
+                # and not as `(f.x = exp1).a.b.c` because a difference in space
+                # should not make a difference in semantic (#4399)
+                # The only exception is doing a splat, in which case this can only
+                # be expanded arguments for the call.
+                if current_char == '*'
+                  next_token_skip_space
+                  arg = parse_single_arg
+                  check :")"
+                  next_token
+                else
+                  arg = parse_op_assign_no_control
+                end
               else
                 skip_space_or_newline
                 arg = parse_single_arg
@@ -684,6 +692,7 @@ module Crystal
           check_void_value atomic, location
 
           column_number = @token.column_number
+          @wants_regex = false
           next_token_skip_space
           atomic = Call.new(atomic, "[]", name_column_number: column_number).at(location)
           atomic.name_size = 0 if atomic.is_a?(Call)
@@ -696,6 +705,7 @@ module Crystal
           call_args = preserve_stop_on_do { parse_call_args_space_consumed check_plus_and_minus: false, allow_curly: true, end_token: :"]" }
           skip_space_or_newline
           check :"]"
+          @wants_regex = false
           next_token
 
           if call_args
@@ -886,18 +896,14 @@ module Crystal
         end
       when :GLOBAL_MATCH_DATA_INDEX
         value = @token.value.to_s
-        if value == "0"
-          node_and_next_token Path.global("PROGRAM_NAME")
+        if value.ends_with? '?'
+          method = "[]?"
+          value = value.rchop
         else
-          if value.ends_with? '?'
-            method = "[]?"
-            value = value.rchop
-          else
-            method = "[]"
-          end
-          location = @token.location
-          node_and_next_token Call.new(Global.new("$~").at(location), method, NumberLiteral.new(value.to_i))
+          method = "[]"
         end
+        location = @token.location
+        node_and_next_token Call.new(Global.new("$~").at(location), method, NumberLiteral.new(value.to_i))
       when :__LINE__
         node_and_next_token MagicConstant.expand_line_node(@token.location)
       when :__END_LINE__
@@ -1195,6 +1201,7 @@ module Crystal
         end
       end
       check :"]"
+      @wants_regex = false
       next_token_skip_space
 
       attr = Attribute.new(name, args, named_args)
@@ -1573,7 +1580,9 @@ module Crystal
       next_token_skip_space_or_newline
 
       if @token.type == :")"
-        return node_and_next_token NilLiteral.new
+        node = Expressions.new([Nop.new] of ASTNode)
+        node.keyword = :"("
+        return node_and_next_token node
       end
 
       exps = [] of ASTNode
@@ -1743,7 +1752,7 @@ module Crystal
       value : String | ASTNode,
       line_number : Int32
 
-    def parse_delimiter
+    def parse_delimiter(want_skip_space = true)
       if @token.type == :STRING
         return node_and_next_token StringLiteral.new(@token.value.to_s)
       end
@@ -1761,7 +1770,7 @@ module Crystal
 
       delimiter_state, has_interpolation, options, token_end_location = consume_delimiter pieces, delimiter_state, has_interpolation
 
-      if delimiter_state.kind == :string
+      if want_skip_space && delimiter_state.kind == :string
         while true
           passed_backslash_newline = @token.passed_backslash_newline
           skip_space
@@ -1853,6 +1862,7 @@ module Crystal
             has_interpolation = true
           end
 
+          skip_space_or_newline
           if @token.type != :"}"
             raise "Unterminated string interpolation"
           end
@@ -1981,14 +1991,14 @@ module Crystal
       end
     end
 
-    def parse_string_without_interpolation(context)
+    def parse_string_without_interpolation(context, want_skip_space = true)
       location = @token.location
 
       unless string_literal_start?
         raise "expected string literal for #{context}, not #{@token}"
       end
 
-      string = parse_delimiter
+      string = parse_delimiter(want_skip_space)
       if string.is_a?(StringLiteral)
         string.value
       else
@@ -2064,6 +2074,7 @@ module Crystal
             break
           end
         end
+        @wants_regex = false
         next_token_skip_space
       end
 
@@ -2099,6 +2110,11 @@ module Crystal
           first_key = parse_op_assign_no_control
           case @token.type
           when :":"
+            # Check that there's no space before the ':'
+            if @token.column_number != first_key.end_location.not_nil!.column_number + 1
+              raise "space not allowed between named argument name and ':'"
+            end
+
             if first_key.is_a?(StringLiteral)
               # It's a named tuple
               unless allow_of
@@ -2265,9 +2281,13 @@ module Crystal
           if named_tuple_start?
             next_token
           elsif string_literal_start?
-            key = parse_string_without_interpolation("named tuple name")
+            key = parse_string_without_interpolation("named tuple name", want_skip_space: false)
           else
             raise "expected '}' or named tuple name, not #{@token}", @token
+          end
+
+          if @token.type == :SPACE
+            raise "space not allowed between named argument name and ':'"
           end
 
           check :":"
@@ -2391,7 +2411,7 @@ module Crystal
             break
           when :end
             if whens.empty?
-              unexpected_token @token.to_s, "expecting when, else or end"
+              unexpected_token @token.to_s, "expecting when or else"
             end
             next_token
             break
@@ -2876,7 +2896,9 @@ module Crystal
 
           check :"%}"
 
+          macro_state.control_nest += 1
           body, end_location = parse_macro_body(start_line, start_column, macro_state)
+          macro_state.control_nest -= 1
 
           check_ident :end
           next_token_skip_space
@@ -2900,7 +2922,9 @@ module Crystal
           next_token_skip_space
           check :"%}"
 
+          macro_state.control_nest += 1
           body, end_location = parse_macro_body(start_line, start_column, macro_state)
+          macro_state.control_nest -= 1
 
           check_ident :end
           next_token_skip_space
@@ -2933,7 +2957,9 @@ module Crystal
 
       check :"%}"
 
+      macro_state.control_nest += 1
       a_then, end_location = parse_macro_body(start_line, start_column, macro_state)
+      macro_state.control_nest -= 1
 
       if @token.type == :IDENT
         case @token.value
@@ -2941,7 +2967,9 @@ module Crystal
           next_token_skip_space
           check :"%}"
 
+          macro_state.control_nest += 1
           a_else, end_location = parse_macro_body(start_line, start_column, macro_state)
+          macro_state.control_nest -= 1
 
           if check_end
             check_ident :end
@@ -3726,6 +3754,7 @@ module Crystal
       arg_index = 0
       splat_index = nil
 
+      slash_is_regex!
       next_token_skip_space
       if @token.type == :"|"
         next_token_skip_space_or_newline
@@ -4060,7 +4089,7 @@ module Crystal
         skip_space_or_newline if allow_newline
         if @token.type == :","
           next_token_skip_space_or_newline
-          if @token.type == :")" || @token.type == :"&"
+          if @token.type == :")" || @token.type == :"&" || @token.type == :"]"
             break
           end
         else
@@ -4469,6 +4498,7 @@ module Crystal
           next_token_skip_space
           size = parse_single_type allow_primitives: true
           check :"]"
+          @wants_regex = false
           next_token_skip_space
           type = make_static_array_type(type, size).at(type.location)
         when :"."
@@ -4691,7 +4721,7 @@ module Crystal
       intel = false
       while true
         location = @token.location
-        option = parse_string_without_interpolation("asm clobber")
+        option = parse_string_without_interpolation("asm option")
         skip_space_or_newline
         case option
         when "volatile"
@@ -4728,7 +4758,7 @@ module Crystal
       end_location = token_end_location
       next_token
 
-      call_args = preserve_stop_on_do { parse_call_args }
+      call_args = preserve_stop_on_do { parse_call_args control: true }
 
       if call_args
         args = call_args.args

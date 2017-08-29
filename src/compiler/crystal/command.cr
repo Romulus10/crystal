@@ -53,7 +53,7 @@ class Crystal::Command
 
   def initialize(@options : Array(String))
     @color = true
-    @stats = @time = false
+    @progress_tracker = ProgressTracker.new
   end
 
   def run
@@ -111,24 +111,24 @@ class Crystal::Command
       puts USAGE
       exit
     end
-  rescue ex : Crystal::ToolException
+  rescue ex : Crystal::LocationlessException
     error ex.message
   rescue ex : Crystal::Exception
     ex.color = @color
     if @config.try(&.output_format) == "json"
-      puts ex.to_json
+      STDERR.puts ex.to_json
     else
-      puts ex
+      STDERR.puts ex
     end
     exit 1
   rescue ex : OptionParser::Exception
     error ex.message
   rescue ex
-    puts ex
+    STDERR.puts ex
     ex.backtrace.each do |frame|
-      puts frame
+      STDERR.puts frame
     end
-    puts
+    STDERR.puts
     error "you've found a bug in the Crystal compiler. Please open an issue, including source code that will allow us to reproduce the bug: https://github.com/crystal-lang/crystal/issues"
   end
 
@@ -177,7 +177,7 @@ class Crystal::Command
 
   private def hierarchy
     config, result = compile_no_codegen "tool hierarchy", hierarchy: true, top_level: true
-    Crystal.timing("Tool (hierarchy)", @stats, delay: true) do
+    @progress_tracker.stage("Tool (hierarchy)") do
       Crystal.print_hierarchy result.program, config.hierarchy_exp, config.output_format
     end
   end
@@ -197,7 +197,7 @@ class Crystal::Command
 
   private def types
     config, result = compile_no_codegen "tool types"
-    Crystal.timing("Tool (types)", @stats, delay: true) do
+    @progress_tracker.stage("Tool (types)") do
       Crystal.print_types result.node
     end
   end
@@ -212,18 +212,23 @@ class Crystal::Command
   end
 
   private def execute(output_filename, run_args)
-    stats = @stats || !@time
-    status = Crystal.timing("Execute", @stats || @time, delay: true, display_memory: stats, padding_size: stats ? 34 : 0) do
+    time? = @time && !@progress_tracker.stats?
+    status, elapsed_time = @progress_tracker.stage("Execute") do
       begin
-        Process.run(output_filename, args: run_args, input: true, output: true, error: true) do |process|
+        start_time = Time.now
+        Process.run(output_filename, args: run_args, input: Process::Redirect::Inherit, output: Process::Redirect::Inherit, error: Process::Redirect::Inherit) do |process|
           # Ignore the signal so we don't exit the running process
           # (the running process can still handle this signal)
           Signal::INT.ignore # do
         end
-        $?
+        {$?, Time.now - start_time}
       ensure
         File.delete(output_filename) rescue nil
       end
+    end
+
+    if time?
+      puts "Execute: #{elapsed_time}"
     end
 
     if status.normal_exit?
@@ -268,6 +273,7 @@ class Crystal::Command
                               hierarchy = false, cursor_command = false,
                               single_file = false)
     compiler = Compiler.new
+    compiler.progress_tracker = @progress_tracker
     link_flags = [] of String
     opt_filenames = nil
     opt_arguments = nil
@@ -370,8 +376,11 @@ class Crystal::Command
       end
 
       opts.on("-s", "--stats", "Enable statistics output") do
-        @stats = true
-        compiler.stats = true
+        @progress_tracker.stats = true
+      end
+
+      opts.on("-p", "--progress", "Enable progress output") do
+        @progress_tracker.progress = true
       end
 
       opts.on("-t", "--time", "Enable execution time output") do
@@ -393,6 +402,9 @@ class Crystal::Command
         opts.on("--verbose", "Display executed commands") do
           compiler.verbose = true
         end
+        opts.on("--static", "Link statically") do
+          compiler.static = true
+        end
       end
 
       opts.unknown_args do |before, after|
@@ -413,7 +425,7 @@ class Crystal::Command
     end
 
     if filenames.size == 0 || (cursor_command && cursor_location.nil?)
-      puts option_parser
+      STDERR.puts option_parser
       exit 1
     end
 
@@ -467,8 +479,10 @@ class Crystal::Command
       compiler.release = true
     end
     opts.on("-s", "--stats", "Enable statistics output") do
-      @stats = true
-      compiler.stats = true
+      compiler.progress_tracker.stats = true
+    end
+    opts.on("-p", "--progress", "Enable progress output") do
+      compiler.progress_tracker.progress = true
     end
     opts.on("-t", "--time", "Enable execution time output") do
       @time = true

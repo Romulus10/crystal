@@ -34,7 +34,7 @@ struct XML::Node
 
   # Sets *attribute* of this node to *value*.
   # Raises `XML::Error` if this node does not support attributes.
-  def []=(name : String, value : String)
+  def []=(name : String, value)
     raise XML::Error.new("Can't set attribute of #{type}", 0) unless element?
     attributes[name] = value
   end
@@ -460,6 +460,11 @@ struct XML::Node
   # Returns the type for this Node as `XML::Type`.
   def type
     @node.value.type
+  end
+
+  # Removes the node from the XML document.
+  def unlink
+    LibXML.xmlUnlinkNode(self)
   end
 
   # Returns `true` if this is an xml Document node.

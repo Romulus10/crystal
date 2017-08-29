@@ -4,6 +4,8 @@
 
 ## Build the compiler
 ##   $ make
+## Build the compiler with progress output
+##   $ make progress=true
 ## Clean up built files then build the compiler
 ##   $ make clean crystal
 ## Build the compiler in release mode
@@ -15,15 +17,17 @@ LLVM_CONFIG ?= ## llvm-config command path to use
 
 release ?=      ## Compile in release mode
 stats ?=        ## Enable statistics output
+progress ?=     ## Enable progress output
 threads ?=      ## Maximum number of threads to use
 debug ?=        ## Add symbolic debug info
 verbose ?=      ## Run specs in verbose mode
 junit_output ?= ## Directory to output junit results
+static ?=       ## Enable static linking
 
 O := .build
 SOURCES := $(shell find src -name '*.cr')
 SPEC_SOURCES := $(shell find spec -name '*.cr')
-FLAGS := $(if $(release),--release )$(if $(stats),--stats )$(if $(threads),--threads $(threads) )$(if $(debug),-d )
+FLAGS := $(if $(release),--release )$(if $(stats),--stats )$(if $(progress),--progress )$(if $(threads),--threads $(threads) )$(if $(debug),-d )$(if $(static),--static )
 SPEC_FLAGS := $(if $(verbose),-v )$(if $(junit_output),--junit_output $(junit_output) )
 EXPORTS := $(if $(release),,CRYSTAL_CONFIG_PATH=`pwd`/src)
 SHELL = bash
@@ -49,7 +53,7 @@ CXXFLAGS += $(if $(debug),-g -O0)
 ifeq (${LLVM_CONFIG},)
   $(error Could not locate llvm-config, make sure it is installed and in your PATH, or set LLVM_CONFIG)
 else
-  $(info $(shell printf '\033[33m')Using $(LLVM_CONFIG) [version=$(shell $(LLVM_CONFIG) --version)]$(shell printf '\033[0m'))
+  $(shell echo $(shell printf '\033[33m')Using $(LLVM_CONFIG) [version=$(shell $(LLVM_CONFIG) --version)]$(shell printf '\033[0m') >/dev/stderr)
 endif
 
 .PHONY: all
@@ -59,17 +63,17 @@ all: crystal ## Build all files (currently crystal only) [default]
 help: ## Show this help
 	@echo
 	@printf '\033[34mtargets:\033[0m\n'
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) |\
+	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) |\
 		sort |\
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 	@echo
 	@printf '\033[34moptional variables:\033[0m\n'
-	@grep -E '^[a-zA-Z_-]+ \?=.*?## .*$$' $(MAKEFILE_LIST) |\
+	@grep -hE '^[a-zA-Z_-]+ \?=.*?## .*$$' $(MAKEFILE_LIST) |\
 		sort |\
 		awk 'BEGIN {FS = " \\?=.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 	@echo
 	@printf '\033[34mrecipes:\033[0m\n'
-	@grep -E '^##.*$$' $(MAKEFILE_LIST) |\
+	@grep -hE '^##.*$$' $(MAKEFILE_LIST) |\
 		awk 'BEGIN {FS = "## "}; /^## [a-zA-Z_-]/ {printf "  \033[36m%s\033[0m\n", $$2}; /^##  / {printf "  %s\n", $$2}'
 
 .PHONY: spec
@@ -120,8 +124,11 @@ $(LIB_CRYSTAL_TARGET): $(LIB_CRYSTAL_OBJS)
 	$(AR) -rcs $@ $^
 
 .PHONY: clean
-clean: ## Clean up built directories and files
-	rm -rf $(O)
-	rm -rf ./doc
+clean: clean_crystal ## Clean up built directories and files
 	rm -rf $(LLVM_EXT_OBJ)
 	rm -rf $(LIB_CRYSTAL_OBJS) $(LIB_CRYSTAL_TARGET)
+
+.PHONY: clean_crystal
+clean_crystal: ## Clean up crystal built files
+	rm -rf $(O)
+	rm -rf ./doc

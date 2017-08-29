@@ -377,6 +377,14 @@ struct Pointer(T)
     end
   end
 
+  # Like `map!`, but yield 2 arugments, the element and it's index
+  def map_with_index!(count : Int, &block)
+    count.times do |i|
+      self[i] = yield self[i], i
+    end
+    self
+  end
+
   # Returns a pointer whose memory address is zero. This doesn't allocate memory.
   #
   # When calling a C function you can also pass `nil` instead of constructing a
@@ -487,7 +495,6 @@ struct Pointer(T)
   # ptr.to_slice(6) # => Slice[0, 0, 0, 13, 14, 15]
   # ```
   def clear(count = 1)
-    ptr = self.as(Pointer(Void))
     Intrinsics.memset(self.as(Void*), 0_u8, (count * sizeof(T)).to_u32, 0_u32, false)
   end
 
